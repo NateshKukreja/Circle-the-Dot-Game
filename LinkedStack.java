@@ -67,4 +67,5 @@ public class LinkedStack<E> implements Stack<E>{
     public void resetLinkedSize(){
     	linkedSize = 0;
     }
+    
 }
