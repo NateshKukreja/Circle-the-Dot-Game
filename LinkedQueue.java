@@ -52,6 +52,7 @@ public class LinkedQueue<E> implements Queue<E> {
     		catch(Exception e) {
     			e.printStackTrace();
     		}
+    		
     	}
         
         E result = front.value;
