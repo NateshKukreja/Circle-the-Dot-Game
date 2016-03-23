@@ -9,5 +9,4 @@ public interface Stack<E> {
     public abstract E pop(); //returns top element and removes it
 
     public abstract void push( E element ); //adds new element to stack
-
 }
