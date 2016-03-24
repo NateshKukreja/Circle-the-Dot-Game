@@ -2,47 +2,186 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.LinkedList;
 
+
 import javax.swing.*;
+
+
+/**
+ * The class <b>GameController</b> is the controller of the game. It implements 
+ * the interface ActionListener to be called back when the player makes a move. It computes
+ * the next step of the game, and then updates model and view.
+ *
+ * @author Guy-Vincent Jourdan, University of Ottawa
+ */
+
 
 public class GameController implements ActionListener {
 
+    /**
+     * Reference to the view of the game
+     */
     private GameView gameView;
+    private LinkedQueue<Point> blueQueue;
+    private LinkedStack<GameModel> linkedStackModel;
+    private LinkedStack<Point> linkedYellowRedo;
+
+    /**
+     * Reference to the model of the game
+     */
     private GameModel gameModel;
+   
+    private LinkedStack<Point> linkedPointBlue=new LinkedStack<Point>();;
+    private LinkedStack<Point> linkedPointYellow=new LinkedStack<Point>();;
+    private Point yellow;
+
+    private GameModel cloneModel;
     
+    /**
+     * Constructor used for initializing the controller. It creates the game's view 
+     * and the game's model instances
+     * 
+     * @param size
+     *            the size of the board on which the game will be played
+     */
     public GameController(int size) {
         gameModel = new GameModel(size);
         gameView = new GameView(gameModel, this);
+        cloneModel = new GameModel(size);
+        linkedStackModel = new LinkedStack<GameModel>();
+        blueQueue = new LinkedQueue<Point>();
+        linkedYellowRedo = new LinkedStack<Point>();
         gameView.update();
     }
 
+
+ 
+    /**
+     * resets the game
+     */
     public void reset(){
+    	
+    	while(!(linkedPointYellow.isEmpty())){
+    		linkedPointYellow.pop();
+    	}
+    	
+    	while(!(blueQueue.isEmpty())){
+    		blueQueue.dequeue();
+    	}
+    	
+    	while(!(linkedPointBlue.isEmpty())){
+    		linkedPointBlue.pop();
+    	}
+    	
+    	while(!(linkedYellowRedo.isEmpty())){
+    		linkedYellowRedo.pop();
+    	}
+    	
         gameModel.reset();
         gameView.update();
     }
+
+    /**
+     * Callback used when the user clicks a button or one of the dots. 
+     * Implements the logic of the game
+     *
+     * @param e
+     *            the ActionEvent
+     */
 
     public void actionPerformed(ActionEvent e) {
         
         if (e.getSource() instanceof DotButton) {
             DotButton clicked = (DotButton)(e.getSource());
-
         	if (gameModel.getCurrentStatus(clicked.getColumn(),clicked.getRow()) ==
                     GameModel.AVAILABLE){
                 gameModel.select(clicked.getColumn(),clicked.getRow());
+                linkedStackModel.push(gameModel);
+                System.out.println(linkedStackModel.getLinkedSize());
+                yellow = new Point(clicked.getColumn(), clicked.getRow());
+                linkedPointYellow.push(yellow);
                 oneStep();
             }
         } else if (e.getSource() instanceof JButton) {
             JButton clicked = (JButton)(e.getSource());
 
             if (clicked.getText().equals("Quit")) {
-                 System.exit(0);
-            } else if (clicked.getText().equals("Reset")){
+            	linkedStackModel.resetLinkedSize();
+            	reset();
+                System.exit(0);
+                 
+            } 
+            else if (clicked.getText().equals("Reset")){
+            	linkedStackModel.resetLinkedSize();
                 reset();
             } 
-        } 
+            else if(clicked.getText().equals("Undo")){
+            	linkedStackUndo();
+            }
+            
+            else if(clicked.getText().equals("Redo")){
+            	linkedStackRedo();
+            }
+        }
+    }
+    
+    
+    private void linkedStackUndo(){
+        if(!(linkedPointYellow.isEmpty())){
+        	Point yellow = linkedPointYellow.pop();
+        	linkedYellowRedo.push(yellow);
+        	gameModel.undoYellow(yellow.getX(), yellow.getY());
+        }
+        else{
+        	System.out.println("You are at the start of the game. No more undos.");
+        }
+        if(!(linkedPointBlue.isEmpty())){
+        	Point blue = linkedPointBlue.pop();
+        	gameModel.undoBlue(blue.getX(), blue.getY());
+        }
+        
+        gameView.update();
+        
+    }
+    
+    private void linkedStackRedo(){
+    	if(!(linkedYellowRedo.isEmpty())){
+    		Point yellow = linkedYellowRedo.pop();
+    		linkedPointYellow.push(yellow);
+    		gameModel.redoYellow(yellow.getX(), yellow.getY());
+    	}
+    	else{
+    		System.out.println("You are at the end of the game. No more redos.");
+    	}
+    	gameView.update();
     }
 
+    private Point Point(int column, int row) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+
+
+	/**
+     * Computes the next step of the game. If the player has lost, it 
+     * shows a dialog offering to replay.
+     * If the user has won, it shows a dialog showing the number of 
+     * steps that had been required in order to win. 
+     * Else, it finds one of the shortest path for the blue dot to 
+     * exit the board and moves it one step in that direction.
+     */
     private void oneStep(){
         Point currentDot = gameModel.getCurrentDot();
+    	if (linkedPointBlue.getLinkedSize() >= 1){
+    		linkedPointBlue.push(blueQueue.dequeue());
+    		blueQueue.enqueue(currentDot);
+    		System.out.println(linkedPointBlue.getLinkedSize() + " blueA");
+    	}
+    	else{
+    		linkedPointBlue.push(currentDot);
+            blueQueue.enqueue(currentDot);
+    		System.out.println(linkedPointBlue.getLinkedSize() + " blueB");
+    	}
         if(isOnBorder(currentDot)) {
             gameModel.setCurrentDot(-1,-1);
             gameView.update();
@@ -58,8 +197,10 @@ public class GameController implements ActionListener {
                     options,
                     options[0]);
             if(n == 0){
+            	linkedStackModel.resetLinkedSize();
                 reset();
             } else{
+            	linkedStackModel.resetLinkedSize();
                 System.exit(0);
             }
         }
@@ -91,6 +232,15 @@ public class GameController implements ActionListener {
         }
  
     }
+
+    /**
+     * Does a ``breadth-first'' search from the current location of the blue dot to find
+     * one of the shortest available path to exit the board. 
+     *
+     * @return the location (as a Point) of the next step for the blue dot toward the exit.
+     * If the blue dot is encircled and cannot exit, returns an instance of the class Point 
+     * at location (-1,-1)
+     */
 
     private Point findDirection(){
         boolean[][] blocked = new boolean[gameModel.getSize()][gameModel.getSize()];
@@ -145,12 +295,36 @@ public class GameController implements ActionListener {
         return new Point(-1,-1);
 
     }
+    
 
+   /**
+     * Helper method: checks if a point is on the border of the board
+     *
+     * @param p
+     *            the point to check
+     *
+     * @return true iff p is on the border of the board
+     */
+     
     private boolean isOnBorder(Point p){
         return (p.getX() == 0 || p.getX() == gameModel.getSize() - 1 ||
                 p.getY() == 0 || p.getY() == gameModel.getSize() - 1 );
     }
 
+   /**
+     * Helper method: find the list of direct neighbours of a point that are not
+     * currenbtly blocked
+     *
+     * @param point
+     *            the point to check
+     * @param blocked
+     *            a 2 dimentionnal array of booleans specifying the points that 
+     *              are currently blocked
+     *
+     * @return an instance of a LinkedList class, holding a list of instances of 
+     *      the class Points representing the neighbours of parameter point that 
+     *      are not currently blocked.
+     */
     private LinkedList<Point> findPossibleNeighbours(Point point, 
             boolean[][] blocked){
 
@@ -176,5 +350,6 @@ public class GameController implements ActionListener {
         }
         return list;
     }
+
 
 }
