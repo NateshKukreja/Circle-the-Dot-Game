@@ -30,8 +30,9 @@ public class GameController implements ActionListener {
      */
     private GameModel gameModel;
    
-    private LinkedStack<Point> linkedPointBlue=new LinkedStack<Point>();;
-    private LinkedStack<Point> linkedPointYellow=new LinkedStack<Point>();;
+    private LinkedStack<Point> linkedPointBlue=new LinkedStack<Point>();
+    private LinkedStack<Point> linkedPointYellow=new LinkedStack<Point>();
+    private LinkedStack<Point> linkedBlueRedo = new LinkedStack<Point>();
     private Point yellow;
 
     private GameModel cloneModel;
@@ -92,8 +93,15 @@ public class GameController implements ActionListener {
         
         if (e.getSource() instanceof DotButton) {
             DotButton clicked = (DotButton)(e.getSource());
-        	if (gameModel.getCurrentStatus(clicked.getColumn(),clicked.getRow()) ==
-                    GameModel.AVAILABLE){
+        	if (gameModel.getCurrentStatus(clicked.getColumn(),clicked.getRow()) == GameModel.AVAILABLE){
+        		if (!(linkedPointYellow.isEmpty())){
+        			if((Point(clicked.getColumn(),clicked.getRow()) == linkedPointYellow.peek())){
+        				while(!(linkedPointYellow.isEmpty())){
+            				linkedPointYellow.pop();
+        				}
+        				linkedPointYellow.push(Point(clicked.getColumn(),clicked.getRow()));
+        			}
+        		}
                 gameModel.select(clicked.getColumn(),clicked.getRow());
                 linkedStackModel.push(gameModel);
                 System.out.println(linkedStackModel.getLinkedSize());
@@ -131,12 +139,17 @@ public class GameController implements ActionListener {
         	linkedYellowRedo.push(yellow);
         	gameModel.undoYellow(yellow.getX(), yellow.getY());
         }
+        
+        if(!(linkedPointBlue.isEmpty())){
+        	Point blue = linkedPointBlue.pop();
+        	gameModel.setCurrentDot(blue.getX(), blue.getY());
+        }
         else{
         	System.out.println("You are at the start of the game. No more undos.");
         }
         if(!(linkedPointBlue.isEmpty())){
-        	Point blue = linkedPointBlue.pop();
-        	gameModel.undoBlue(blue.getX(), blue.getY());
+        	//System.out.println("Here");
+
         }
         
         gameView.update();
@@ -148,6 +161,12 @@ public class GameController implements ActionListener {
     		Point yellow = linkedYellowRedo.pop();
     		linkedPointYellow.push(yellow);
     		gameModel.redoYellow(yellow.getX(), yellow.getY());
+    	}
+    	
+    	if(!(linkedBlueRedo.isEmpty())){
+    		Point blue = linkedBlueRedo.pop();
+    		blueQueue.enqueue(blue);
+    		gameModel.setCurrentDot(blue.getX(), blue.getY());
     	}
     	else{
     		System.out.println("You are at the end of the game. No more redos.");
@@ -172,16 +191,11 @@ public class GameController implements ActionListener {
      */
     private void oneStep(){
         Point currentDot = gameModel.getCurrentDot();
-    	if (linkedPointBlue.getLinkedSize() >= 1){
-    		linkedPointBlue.push(blueQueue.dequeue());
-    		blueQueue.enqueue(currentDot);
-    		System.out.println(linkedPointBlue.getLinkedSize() + " blueA");
-    	}
-    	else{
-    		linkedPointBlue.push(currentDot);
-            blueQueue.enqueue(currentDot);
-    		System.out.println(linkedPointBlue.getLinkedSize() + " blueB");
-    	}
+        
+        if (!(blueQueue.isEmpty())){
+        	linkedPointBlue.push(blueQueue.dequeue());
+        }
+        
         if(isOnBorder(currentDot)) {
             gameModel.setCurrentDot(-1,-1);
             gameView.update();
@@ -226,6 +240,8 @@ public class GameController implements ActionListener {
                 }
             }
             else{
+            	Point blue = new Point(direction.getX(), direction.getY());
+            	blueQueue.enqueue(blue);
                 gameModel.setCurrentDot(direction.getX(), direction.getY());
                 gameView.update();
             }
@@ -259,7 +275,6 @@ public class GameController implements ActionListener {
         // start with neighbours of the current dot
         // (note: we know the current dot isn't on the border)
         Point currentDot = gameModel.getCurrentDot();
-
         possibleNeighbours = findPossibleNeighbours(currentDot, blocked);
 
         // adding some non determinism into the game !
@@ -350,4 +365,6 @@ public class GameController implements ActionListener {
         }
         return list;
     }
+
+
 }
